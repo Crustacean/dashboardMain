@@ -11,7 +11,7 @@ def selectConfigurationValue(
 
 def pipelineConfigurationDefaults() {
   return [
-    'OCTANE_SPACES_MAPPING_FILE': 'examples/octane_spaces_mapping.json',
+    'OCTANE_SPACES_MAPPING_FILE': 'octane_spaces_mapping.json',
     'OCTANE_SHARED_SPACE_NAME': '',
     'OCTANE_WORKSPACE_NAME': '',
     'OCTANE_REGRESSION_SUITE_RUN_ID': '',

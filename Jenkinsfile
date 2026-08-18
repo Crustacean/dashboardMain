@@ -1,12 +1,61 @@
 def selectConfigurationValue(
-    String key, Map jobParameters, Map yamlConfiguration, environment) {
+    String key, Map jobParameters, Map yamlConfiguration, Map configurationDefaults) {
   if (yamlConfiguration.containsKey(key)) {
     return yamlConfiguration.get(key)
   }
   if (jobParameters.containsKey(key)) {
     return jobParameters.get(key)
   }
-  return environment.getProperty(key)
+  return configurationDefaults.get(key)
+}
+
+def pipelineConfigurationDefaults() {
+  return [
+    'OCTANE_SPACES_MAPPING_FILE': 'examples/octane_spaces_mapping.json',
+    'OCTANE_SHARED_SPACE_NAME': '',
+    'OCTANE_WORKSPACE_NAME': '',
+    'OCTANE_REGRESSION_SUITE_RUN_ID': '',
+    'OCTANE_CRITICAL_SUITE_RUN_ID': '',
+    'OCTANE_DEFINED_SCOPE': '',
+    'OCTANE_CRITICAL_SCOPE_NAME': 'critical',
+    'OCTANE_PROJECT_NAME': 'Octane Project',
+    'OCTANE_DOMAIN_NAME': 'Octane Domain',
+    'AUTOMATED_TESTING_TARGET': '100',
+    'BROWSERPATH': '',
+    'OCTANE_TIMEOUT_MINUTES': '120',
+    'OCTANE_TIMEOUT_MINUTES_EXTENDED': '0',
+    'OCTANE_POLL_INTERVAL_SECONDS': '1',
+    'OCTANE_BASE_PASSRATE_FIGURE': '95',
+    'OCTANE_BASE_EXECUTION_FIGURE': '100',
+    'OCTANE_MARK_UNSTABLE': 'false',
+    'OCTANE_CRITERIA': '''
+      (regressions.executionRate == 100 AND regressions.passRate >= 95)
+      AND (critical.executionRate == 100 AND critical.passRate == 100)
+      AND (defects.major < 10% AND defects.minor < 20%)
+      AND (defects.Unspecified == 0%)
+    ''',
+    'OCTANE_MAJOR_DEFECT_GROUP_NAME': 'major',
+    'OCTANE_MAJOR_DEFECT_TYPES': 'Critical, Very High, High, Unspecified',
+    'OCTANE_MINOR_DEFECT_GROUP_NAME': 'minor',
+    'OCTANE_MINOR_DEFECT_TYPES': 'Low, Medium',
+    'OCTANE_RISK_HEAT_MAP': 'true',
+    'OCTANE_RISK_HEAT_MAP_DEFECT_QUERY': '',
+    'OCTANE_RISK_HEAT_MAP_MAX_DEFECTS': '1000',
+    'PROGRESS_EMAIL_INTERVAL_CRONJOB': '',
+    'PROGRESS_EMAIL_STALENESS_THRESHOLD_MINUTES': '1',
+    'OCTANE_EMAIL_TO': '',
+    'OCTANE_EMAIL_CC': '',
+    'OCTANE_EMAIL_BCC': '',
+    'OCTANE_EMAIL_FROM': 'elkyem@gmail.com',
+    'OCTANE_EMAIL_REPLY_TO': 'elkyem@gmail.com',
+    'OCTANE_EMAIL_PRINT_DEFECT_GROUPS': 'true',
+    'OCTANE_EMAIL_THEME': 'DARK',
+    'OCTANE_EMAIL_VIEWPORT_WIDTH': '1400',
+    'OCTANE_PROGRESS_EMAIL_ON_FAILURE': 'WARN',
+    'OCTANE_PROGRESS_EMAIL_ARCHIVE_SCREENSHOT': 'false',
+    'OCTANE_FINAL_EMAIL_ON_FAILURE': 'UNSTABLE',
+    'OCTANE_FINAL_EMAIL_ARCHIVE_SCREENSHOT': 'true'
+  ]
 }
 
 def resolvePipelineSourcePath(String path, environment) {
@@ -16,130 +65,63 @@ def resolvePipelineSourcePath(String path, environment) {
   }
   boolean absolutePath =
       requestedPath.startsWith('/') || requestedPath ==~ /^[A-Za-z]:[\\\/].*/
-  String sourceDirectory = environment.OCTANE_PIPELINE_SOURCE_DIR?.toString()?.trim()
+  String sourceDirectory =
+      environment.getProperty('OCTANE_PIPELINE_SOURCE_DIR')?.toString()?.trim()
   return sourceDirectory && !absolutePath
       ? "${sourceDirectory}/${requestedPath}".toString()
       : requestedPath
+}
+
+def bootstrappedConfigurationJson(environment) {
+  return environment.getProperty('OCTANE_BOOTSTRAP_CONFIGURATION_JSON')?.toString()?.trim()
 }
 
 pipeline {
   agent any
 
   environment {
-    // The copied YAML is authoritative; job parameters and these defaults fill omitted keys only.
+    // Runtime values are applied after this Declarative environment scope is created.
     PARAMS_FILE = 'variables.yaml'
-    OCTANE_SPACES_MAPPING_FILE = 'examples/octane_spaces_mapping.json'
-    OCTANE_SERVER_ID = ''
-    OCTANE_SHARED_SPACE_NAME = ''
-    OCTANE_WORKSPACE_NAME = ''
-    OCTANE_SHARED_SPACE_ID = ''
-    OCTANE_WORKSPACE_ID = ''
-    OCTANE_REGRESSION_SUITE_RUN_ID = ''
-    OCTANE_CRITICAL_SUITE_RUN_ID = ''
-    OCTANE_DEFINED_SCOPE = ''
-    OCTANE_CRITICAL_SCOPE_NAME = 'critical'
-    OCTANE_PROJECT_NAME = 'Octane Project'
-    OCTANE_DOMAIN_NAME = 'Octane Domain'
-    AUTOMATED_TESTING_TARGET = '100'
-    BROWSERPATH = ''
-    OCTANE_TIMEOUT_MINUTES = '120'
-    OCTANE_TIMEOUT_MINUTES_EXTENDED = '0'
-    OCTANE_POLL_INTERVAL_SECONDS = '1'
-    OCTANE_BASE_PASSRATE_FIGURE = '95'
-    OCTANE_BASE_EXECUTION_FIGURE = '100'
-    OCTANE_MARK_UNSTABLE = 'false'
-    OCTANE_CRITERIA = '''
-      (regressions.executionRate == 100 AND regressions.passRate >= 95)
-      AND (critical.executionRate == 100 AND critical.passRate == 100)
-      AND (defects.major < 10% AND defects.minor < 20%)
-      AND (defects.Unspecified == 0%)
-    '''
-    OCTANE_MAJOR_DEFECT_GROUP_NAME = 'major'
-    OCTANE_MAJOR_DEFECT_TYPES = 'Critical, Very High, High, Unspecified'
-    OCTANE_MINOR_DEFECT_GROUP_NAME = 'minor'
-    OCTANE_MINOR_DEFECT_TYPES = 'Low, Medium'
-    OCTANE_RISK_HEAT_MAP = 'true'
-    OCTANE_RISK_HEAT_MAP_DEFECT_QUERY = ''
-    OCTANE_RISK_HEAT_MAP_MAX_DEFECTS = '1000'
-    PROGRESS_EMAIL_INTERVAL_CRONJOB = ''
-    PROGRESS_EMAIL_STALENESS_THRESHOLD_MINUTES = '1'
-    OCTANE_EMAIL_TO = ''
-    OCTANE_EMAIL_CC = ''
-    OCTANE_EMAIL_BCC = ''
-    OCTANE_EMAIL_FROM = 'elkyem@gmail.com'
-    OCTANE_EMAIL_REPLY_TO = 'elkyem@gmail.com'
-    OCTANE_EMAIL_PRINT_DEFECT_GROUPS = 'true'
-    OCTANE_EMAIL_THEME = 'DARK'
-    OCTANE_EMAIL_VIEWPORT_WIDTH = '1400'
-    OCTANE_PROGRESS_EMAIL_ON_FAILURE = 'WARN'
-    OCTANE_PROGRESS_EMAIL_ARCHIVE_SCREENSHOT = 'false'
-    OCTANE_FINAL_EMAIL_ON_FAILURE = 'UNSTABLE'
-    OCTANE_FINAL_EMAIL_ARCHIVE_SCREENSHOT = 'true'
   }
 
   stages {
     stage('Load Configuration') {
       steps {
         script {
-          boolean parameterFileProvided =
-              params.containsKey('PARAMS_FILE') &&
-              params.PARAMS_FILE != null &&
-              params.PARAMS_FILE.toString().trim()
-          String paramsFile =
-              parameterFileProvided
-                  ? params.PARAMS_FILE.toString().trim()
-                  : env.PARAMS_FILE.trim()
-          paramsFile = resolvePipelineSourcePath(paramsFile, env)
-          if (!fileExists(paramsFile)) {
-            error "Octane configuration file was not found in the workspace: ${paramsFile}"
-          }
+          Map configurationDefaults = pipelineConfigurationDefaults()
+          List<String> configurationKeys =
+              configurationDefaults.keySet().collect { Object key -> key.toString() }
+          String transportedConfigurationJson = bootstrappedConfigurationJson(env)
+          Map yamlConfiguration
+          String configurationSource
+          if (transportedConfigurationJson) {
+            def transportedConfiguration = readJSON(text: transportedConfigurationJson)
+            if (!(transportedConfiguration instanceof Map)) {
+              error 'Transported Octane configuration must contain a top-level map.'
+            }
+            yamlConfiguration = transportedConfiguration as Map
+            configurationSource = 'validated variables.yaml from the dir2 bootstrap'
+          } else {
+            boolean parameterFileProvided =
+                params.containsKey('PARAMS_FILE') &&
+                params.PARAMS_FILE != null &&
+                params.PARAMS_FILE.toString().trim()
+            String paramsFile =
+                parameterFileProvided
+                    ? params.PARAMS_FILE.toString().trim()
+                    : env.PARAMS_FILE.trim()
+            paramsFile = resolvePipelineSourcePath(paramsFile, env)
+            if (!fileExists(paramsFile)) {
+              error "Octane configuration file was not found in the workspace: ${paramsFile}"
+            }
 
-          def loadedConfiguration = readYaml(file: paramsFile)
-          if (!(loadedConfiguration instanceof Map)) {
-            error "Octane configuration file must contain a top-level YAML map: ${paramsFile}"
+            def loadedConfiguration = readYaml(file: paramsFile)
+            if (!(loadedConfiguration instanceof Map)) {
+              error "Octane configuration file must contain a top-level YAML map: ${paramsFile}"
+            }
+            yamlConfiguration = loadedConfiguration as Map
+            configurationSource = paramsFile
           }
-          Map yamlConfiguration = loadedConfiguration as Map
-          List<String> configurationKeys = [
-            'OCTANE_SPACES_MAPPING_FILE',
-            'OCTANE_SHARED_SPACE_NAME',
-            'OCTANE_WORKSPACE_NAME',
-            'OCTANE_REGRESSION_SUITE_RUN_ID',
-            'OCTANE_CRITICAL_SUITE_RUN_ID',
-            'OCTANE_DEFINED_SCOPE',
-            'OCTANE_CRITICAL_SCOPE_NAME',
-            'OCTANE_PROJECT_NAME',
-            'OCTANE_DOMAIN_NAME',
-            'AUTOMATED_TESTING_TARGET',
-            'BROWSERPATH',
-            'OCTANE_TIMEOUT_MINUTES',
-            'OCTANE_TIMEOUT_MINUTES_EXTENDED',
-            'OCTANE_POLL_INTERVAL_SECONDS',
-            'OCTANE_BASE_PASSRATE_FIGURE',
-            'OCTANE_BASE_EXECUTION_FIGURE',
-            'OCTANE_MARK_UNSTABLE',
-            'OCTANE_CRITERIA',
-            'OCTANE_MAJOR_DEFECT_GROUP_NAME',
-            'OCTANE_MAJOR_DEFECT_TYPES',
-            'OCTANE_MINOR_DEFECT_GROUP_NAME',
-            'OCTANE_MINOR_DEFECT_TYPES',
-            'OCTANE_RISK_HEAT_MAP',
-            'OCTANE_RISK_HEAT_MAP_DEFECT_QUERY',
-            'OCTANE_RISK_HEAT_MAP_MAX_DEFECTS',
-            'PROGRESS_EMAIL_INTERVAL_CRONJOB',
-            'PROGRESS_EMAIL_STALENESS_THRESHOLD_MINUTES',
-            'OCTANE_EMAIL_TO',
-            'OCTANE_EMAIL_CC',
-            'OCTANE_EMAIL_BCC',
-            'OCTANE_EMAIL_FROM',
-            'OCTANE_EMAIL_REPLY_TO',
-            'OCTANE_EMAIL_PRINT_DEFECT_GROUPS',
-            'OCTANE_EMAIL_THEME',
-            'OCTANE_EMAIL_VIEWPORT_WIDTH',
-            'OCTANE_PROGRESS_EMAIL_ON_FAILURE',
-            'OCTANE_PROGRESS_EMAIL_ARCHIVE_SCREENSHOT',
-            'OCTANE_FINAL_EMAIL_ON_FAILURE',
-            'OCTANE_FINAL_EMAIL_ARCHIVE_SCREENSHOT'
-          ]
           List<String> unknownKeys =
               yamlConfiguration.keySet()
                   .collect { it.toString() }
@@ -151,7 +133,7 @@ pipeline {
 
           configurationKeys.each { String key ->
             def selectedValue =
-                selectConfigurationValue(key, params, yamlConfiguration, env)
+                selectConfigurationValue(key, params, yamlConfiguration, configurationDefaults)
             if (selectedValue instanceof Map || selectedValue instanceof Collection) {
               error "Octane configuration value ${key} must be a scalar."
             }
@@ -245,7 +227,7 @@ pipeline {
           env.OCTANE_SHARED_SPACE_ID = mappedSharedSpaceId
           env.OCTANE_WORKSPACE_ID = mappedWorkspaceId
 
-          echo "Loaded Octane configuration from ${paramsFile}."
+          echo "Loaded Octane configuration from ${configurationSource}."
           echo(
               "Resolved shared space '${sharedSpaceSelector}' to '${resolvedSharedSpaceName}' "
                   + "(${env.OCTANE_SHARED_SPACE_ID}) and workspace '${workspaceSelector}' to "
